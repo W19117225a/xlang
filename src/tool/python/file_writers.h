@@ -4,12 +4,27 @@ namespace pywinrt
 {
     namespace stdfs = std::experimental::filesystem;
 
+    inline void write_pch_cpp(stdfs::path const& folder)
+    {
+        writer w;
+        write_license(w);
+        w.write("#include \"pch.h\"\n");
+        w.flush_to_file(folder / "pch.cpp");
+    }
+
+    inline void write_pch_h(stdfs::path const& folder)
+    {
+        writer w;
+        write_license(w);
+        w.write("#pragma once\n#include \"pybase.h\"\n");
+        w.flush_to_file(folder / "pch.h");
+    }
+
     inline void write_pybase_h(stdfs::path const& folder)
     {
         writer w;
         write_license(w);
         w.write(strings::pybase);
-        create_directories(folder);
         w.flush_to_file(folder / "pybase.h");
     }
 
@@ -83,7 +98,6 @@ namespace pywinrt
             w.write(format, ns);
         }
 
-        create_directories(folder);
         w.flush_to_file(folder / filename);
     }
 
@@ -94,17 +108,33 @@ namespace pywinrt
         auto filename = w.write_temp("py.%.cpp", ns);
 
         write_license(w);
+        w.write("#include \"pch.h\"\n");
         w.write("#include \"py.%.h\"\n", ns);
+
+        settings.filter.bind_each<write_winrt_type_specialization_storage>(members.classes)(w);
+        settings.filter.bind_each<write_winrt_type_specialization_storage>(members.interfaces)(w);
+        settings.filter.bind_each<write_winrt_type_specialization_storage>(members.structs)(w);
+
         if (ns == "Windows.Foundation")
         {
             w.write(strings::custom_struct_convert);
         }
-        settings.filter.bind_each<write_inspectable_type>(members.classes)(w);
-        settings.filter.bind_each<write_inspectable_type>(members.interfaces)(w);
-        settings.filter.bind_each<write_struct>(members.structs)(w);
-        write_namespace_initialization(w, ns, members);
+        settings.filter.bind_each<write_struct_convert_functions>(members.structs)(w);
 
-        create_directories(folder);
+        auto segments = get_dotted_name_segments(ns);
+        w.write("\n\nnamespace py::cpp::%\n{", bind_list("::", segments));
+        {
+            writer::indent_guard g{ w };
+
+            settings.filter.bind_each<write_inspectable_type>(members.classes)(w);
+            settings.filter.bind_each<write_inspectable_type>(members.interfaces)(w);
+            settings.filter.bind_each<write_struct>(members.structs)(w);
+            write_namespace_initialization(w, ns, members);
+        }
+        w.write("} // py::cpp::%\n", bind_list("::", segments));
+
+        write_namespace_module_init_function(w, ns);
+
         w.flush_to_file(folder / filename);
         return std::move(w.needed_namespaces);
     }
@@ -117,7 +147,6 @@ namespace pywinrt
         w.write(strings::module_methods, settings.module, settings.module, settings.module, settings.module);
 
         auto filename = w.write_temp("_%.cpp", settings.module);
-        create_directories(folder);
         w.flush_to_file(folder / filename);
     }
 
@@ -132,8 +161,7 @@ namespace pywinrt
         writer w;
 
         write_license(w, "#");
-        w.write(strings::setup, settings.module, settings.module, bind<write_python_setup_filenames>(namespaces));
-        create_directories(folder);
+        w.write(strings::setup, settings.module, settings.module, settings.module, settings.module);
         w.flush_to_file(folder / "setup.py");
     }
 
@@ -143,8 +171,6 @@ namespace pywinrt
 
         write_license(w, "#");
         w.write(strings::package_init, settings.module, settings.module, settings.module, settings.module);
-
-        create_directories(folder);
         w.flush_to_file(folder / "__init__.py");
     }
 
@@ -164,14 +190,13 @@ namespace pywinrt
 
         w.write("\n_ns_module = %._import_ns_module(\"%\")\n", module_name, ns);
 
-		w.write_each<write_python_import_namespace>(needed_namespaces);
+        w.write_each<write_python_import_namespace>(needed_namespaces);
         settings.filter.bind_each<write_python_enum>(members.enums)(w);
-		w.write("\n");
+        w.write("\n");
         settings.filter.bind_each<write_python_import_type>(members.structs)(w);
         settings.filter.bind_each<write_python_import_type>(members.classes)(w);
         settings.filter.bind_each<write_python_import_type>(members.interfaces)(w);
 
-        create_directories(folder);
         w.flush_to_file(folder / "__init__.py");
     }
 }
