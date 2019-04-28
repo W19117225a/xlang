@@ -1,6 +1,8 @@
 #include "pch.h"
 #include <windows.h>
 #include <roapi.h>
+#include <restrictederrorinfo.h>
+#include <atlbase.h>
 
 // Note: this implementation intentionally avoids using any C++ standard library features like new/malloc/atomic
 // to ensure that the runtime behavior is ABI stable.
@@ -61,6 +63,95 @@ namespace
         }
     };
 
+    struct error_object : winrt::implements<error_object, IErrorInfo, IRestrictedErrorInfo>
+    {
+        error_object(HRESULT code, std::wstring_view const& message) :
+            m_code(code),
+            m_message(SysAllocString(message.data()))
+        {
+            CComBSTR b;
+        }
+
+        // IErrorInfo
+
+        HRESULT WINRT_CALL GetGUID(GUID* value) noexcept final
+        {
+            *value = {};
+            return S_OK;
+        }
+
+        HRESULT WINRT_CALL GetSource(BSTR* value) noexcept final
+        {
+            *value = nullptr;
+            return S_OK;
+        }
+
+        HRESULT WINRT_CALL GetDescription(BSTR* value) noexcept final
+        {
+            *value = duplicate_bstr(m_message.get());
+            return S_OK;
+
+        }
+
+        HRESULT WINRT_CALL GetHelpFile(BSTR* value) noexcept final
+        {
+            *value = nullptr;
+            return S_OK;
+
+        }
+
+        HRESULT WINRT_CALL GetHelpContext(DWORD* value) noexcept final
+        {
+            *value = 0;
+            return S_OK;
+        }
+
+        // IRestrictedErrorInfo
+
+        HRESULT WINRT_CALL GetErrorDetails(BSTR* description, HRESULT* error, BSTR* restricted, BSTR* capabilitySid) noexcept final
+        {
+            *description = nullptr;
+            *error = m_code;
+            *restricted = duplicate_bstr(m_message.get());
+            *capabilitySid = nullptr;
+            return S_OK;
+
+        }
+
+        HRESULT WINRT_CALL GetReference(BSTR* value) noexcept final
+        {
+            *value = nullptr;
+            return S_OK;
+        }
+
+    private:
+
+        BSTR duplicate_bstr(BSTR value) const noexcept
+        {
+            return SysAllocStringByteLen(reinterpret_cast<char*>(value), SysStringByteLen(value));
+        }
+
+        struct bstr_traits
+        {
+            using type = BSTR;
+
+            static void close(type value) noexcept
+            {
+                SysFreeString(value);
+            }
+
+            static constexpr type invalid() noexcept
+            {
+                return nullptr;
+            }
+        };
+
+        using bstr_handle = winrt::handle_type<bstr_traits>;
+
+        HRESULT m_code{};
+        bstr_handle m_message;
+    };
+
     hstring_reference* get_hstring_reference(void* string) noexcept
     {
         auto reference = static_cast<hstring_reference*>(string);
@@ -76,8 +167,26 @@ namespace
 
 int32_t WINRT_CALL WINRT_GetRestrictedErrorInfo(void** info) noexcept
 {
-    *info = nullptr;
-    return 0;
+
+    winrt::com_ptr<IErrorInfo> error_info;
+    GetErrorInfo(0, error_info.put());
+
+    if (!error_info)
+    {
+        *info = nullptr;
+        return S_OK; // S_OK or S_FALSE?
+    }
+
+    return error_info.as(winrt::guid_of<IRestrictedErrorInfo>(), info);
+}
+
+int32_t WINRT_CALL WINRT_RoOriginateLanguageException(int32_t error, void* hstring, void*) noexcept
+{
+    uint32_t length{};
+    wchar_t const* const buffer = WINRT_WindowsGetStringRawBuffer(hstring, &length);
+    std::wstring_view const message{ buffer, length };
+
+    return S_OK == SetErrorInfo(0, winrt::make<error_object>(error, message).get());
 }
 
 int32_t WINRT_CALL WINRT_RoGetActivationFactory(void* classId, winrt::guid const& iid, void** factory) noexcept
@@ -90,21 +199,16 @@ int32_t WINRT_CALL WINRT_RoInitialize(uint32_t const type) noexcept
     return CoInitializeEx(0, type == 0 ? COINIT_APARTMENTTHREADED : COINIT_MULTITHREADED);
 }
 
-int32_t WINRT_CALL WINRT_RoOriginateLanguageException(int32_t error, void* message, void* exception) noexcept
-{
-    return 0;
-}
-
 int32_t WINRT_CALL WINRT_WindowsCreateString(wchar_t const* const value, uint32_t const size, void** result) noexcept
 {
     if (size == 0)
     {
         *result = nullptr;
-        return 0;
+        return S_OK;
     }
 
     *result = hstring_handle::create(value, size);
-    return *result ? 0 : E_OUTOFMEMORY;
+    return *result ? S_OK : E_OUTOFMEMORY;
 }
 
 int32_t WINRT_CALL WINRT_WindowsDuplicateString(void* value, void** result) noexcept
@@ -112,7 +216,7 @@ int32_t WINRT_CALL WINRT_WindowsDuplicateString(void* value, void** result) noex
     if (!value)
     {
         *result = nullptr;
-        return 0;
+        return S_OK;
     }
 
     if (auto reference = get_hstring_reference(value))
@@ -122,7 +226,7 @@ int32_t WINRT_CALL WINRT_WindowsDuplicateString(void* value, void** result) noex
 
     *result = value;
     static_cast<hstring_handle*>(value)->add_ref();
-    return 0;
+    return S_OK;
 }
 
 int32_t WINRT_CALL WINRT_WindowsCreateStringReference(wchar_t const* const value, uint32_t const size, void* header, void** result) noexcept
@@ -148,7 +252,7 @@ int32_t WINRT_CALL WINRT_WindowsDeleteString(void* string) noexcept
         static_cast<hstring_handle*>(string)->release();
     }
 
-    return 0;
+    return S_OK;
 }
 
 wchar_t const* WINRT_CALL WINRT_WindowsGetStringRawBuffer(void* string, uint32_t* size) noexcept
