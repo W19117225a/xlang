@@ -218,11 +218,12 @@ TEST_CASE("Parameter signature simple type metadata")
             delegate Double e2();
             delegate Char16 e3();
             delegate Boolean e4();
+            delegate void e5();
         }
     )" };
     std::string assembly_name = "testidl";
     xlang::meta::reader::database db{ run_and_save_to_memory(test_idl, assembly_name) };
-    REQUIRE(db.MethodDef.size() == 26);
+    REQUIRE(db.MethodDef.size() == 28);
     // Testing invoke method
     {
         auto const& delegate_invoke = db.MethodDef[1];
@@ -313,5 +314,11 @@ TEST_CASE("Parameter signature simple type metadata")
         auto const& delegate_sig = delegate_invoke.Signature();
         REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
         REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::Boolean);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[27];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "e5");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(!delegate_invoke.Signature().ReturnType());
     }
 }
