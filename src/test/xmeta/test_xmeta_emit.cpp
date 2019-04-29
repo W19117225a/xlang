@@ -199,3 +199,119 @@ TEST_CASE("Delegate metadata")
         REQUIRE(std::get<ElementType>(delegate_param.Type().Type()) == ElementType::I4);
     }
 }
+
+TEST_CASE("Parameter signature simple type metadata")
+{
+    std::istringstream test_idl{ R"(
+        namespace Windows.Test
+        {
+            delegate String d1();
+            delegate Int8 d2();
+            delegate Int16 d3();
+            delegate Int32 d4();
+            delegate Int64 d5();
+            delegate UInt8 d6();
+            delegate UInt16 d7();
+            delegate UInt32 d8();
+            delegate UInt64 d9();
+            delegate Single e1();
+            delegate Double e2();
+            delegate Char16 e3();
+            delegate Boolean e4();
+        }
+    )" };
+    std::string assembly_name = "testidl";
+    xlang::meta::reader::database db{ run_and_save_to_memory(test_idl, assembly_name) };
+    REQUIRE(db.MethodDef.size() == 26);
+    // Testing invoke method
+    {
+        auto const& delegate_invoke = db.MethodDef[1];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d1");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::String);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[3];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d2");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::I1);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[5];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d3");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::I2);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[7];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d4");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::I4);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[9];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d5");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::I8);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[11];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d6");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::U1);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[13];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d7");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::U2);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[15];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d8");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::U4);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[17];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "d9");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::U8);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[19];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "e1");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::R4);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[21];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "e2");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::R8);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[23];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "e3");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::Char);
+    }
+    {
+        auto const& delegate_invoke = db.MethodDef[25];
+        REQUIRE(delegate_invoke.Parent().TypeName() == "e4");
+        auto const& delegate_sig = delegate_invoke.Signature();
+        REQUIRE(std::holds_alternative<ElementType>(delegate_sig.ReturnType().Type().Type()));
+        REQUIRE(std::get<ElementType>(delegate_sig.ReturnType().Type().Type()) == ElementType::Boolean);
+    }
+}

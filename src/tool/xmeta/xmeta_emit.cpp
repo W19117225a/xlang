@@ -107,6 +107,8 @@ namespace
         {
         case simple_type::String:
             return ElementType::String;
+        case simple_type::Boolean:
+            return ElementType::Boolean;
         case simple_type::Int8:
             return ElementType::I1;
         case simple_type::UInt8:
