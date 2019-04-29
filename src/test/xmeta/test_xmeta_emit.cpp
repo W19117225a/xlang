@@ -164,40 +164,17 @@ TEST_CASE("Delegate metadata")
         }
     )" };
     std::string assembly_name = "testidl";
+    xlang::meta::reader::database db{ run_and_save_to_memory(test_idl, assembly_name) };
 
-    std::map<std::string_view, std::shared_ptr<namespace_model>, std::less<>> v;
-    std::string ns_name("Windows.Test");
-    std::shared_ptr<namespace_model> ns(new namespace_model(ns_name, 0, assembly_name, nullptr));
-    std::shared_ptr<namespace_body_model> ns_bm = std::make_shared<namespace_body_model>(namespace_body_model(ns));
-    std::string delegate_name("testdelegate");
-    std::shared_ptr<delegate_model> delegate_model_m = std::make_shared<delegate_model>(delegate_name, 0, assembly_name, ns_bm, type_ref(simple_type::Int32));
-    formal_parameter_model param1("c", 0, assembly_name, parameter_semantics::in, type_ref(simple_type::Int32));
-    formal_parameter_model param2("d", 0, assembly_name, parameter_semantics::in, type_ref(simple_type::Int32));
-
-    delegate_model_m->add_formal_parameter(std::move(param1));
-    delegate_model_m->add_formal_parameter(std::move(param2));
-    ns_bm->add_delegate(delegate_model_m);
-    ns->add_namespace_body(ns_bm);
-
-    v["test"] = ns;
-    xlang::xmeta::xmeta_emit emitter(assembly_name);
-    xlang::xmeta::xlang_model_walker walker(v, emitter);
-    walker.walk();
-
-    xlang::meta::writer::pe_writer writer;
-    writer.add_metadata(emitter.save_to_memory());
-    xlang::meta::reader::database db{ writer.save_to_memory() };
-
-    REQUIRE(db.TypeDef.size() == 2);
     auto const& delegate_type = db.TypeDef[1];
     test_delegate_type_properties(delegate_type);
+    REQUIRE(db.TypeDef.size() == 2);
+    REQUIRE(db.Param.size() == 5);
+    REQUIRE(db.MethodDef.size() == 2);
     REQUIRE(delegate_type.TypeNamespace() == "Windows.Test");
     REQUIRE(delegate_type.TypeName() == "testdelegate");
     REQUIRE(delegate_type.Flags().value == (tdPublic | tdSealed | tdClass | tdWindowsRuntime));
-    // Param Table
-    REQUIRE(db.Param.size() == 5);
 
-    REQUIRE(db.MethodDef.size() == 2);
     // Testing constructor method
     auto const& delegate_constructor = db.MethodDef[0];
     REQUIRE(delegate_constructor.Name() == ".ctor");
@@ -221,5 +198,4 @@ TEST_CASE("Delegate metadata")
         REQUIRE(std::holds_alternative<ElementType>(delegate_param.Type().Type()));
         REQUIRE(std::get<ElementType>(delegate_param.Type().Type()) == ElementType::I4);
     }
-
 }

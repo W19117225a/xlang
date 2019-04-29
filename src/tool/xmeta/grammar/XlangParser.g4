@@ -467,14 +467,7 @@ enum_identifier
 
 /* Delegates */
 delegate_declaration
-    : attributes? delegate_modifier* DELEGATE return_type
+    : attributes? DELEGATE return_type
         IDENTIFIER type_parameter_list?
         OPEN_PARENS formal_parameter_list? CLOSE_PARENS SEMICOLON
     ;
-
-delegate_modifier
-    : NEW
-    | PROTECTED
-    | PRIVATE
-    ;
-
