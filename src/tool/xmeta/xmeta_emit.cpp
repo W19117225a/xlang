@@ -697,7 +697,6 @@ namespace xlang::xmeta
             define_parameters(val, token_delegate_invoke_def, index);
             index++;
         }
-
     }
 
     mdParamDef xmeta_emit::define_return(std::optional<type_ref> const& retun_type, mdTypeDef const& type_def)
